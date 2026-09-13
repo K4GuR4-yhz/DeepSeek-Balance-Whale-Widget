@@ -1,34 +1,16 @@
 {
-  "name": "dsh-whale-widget",
-  "version": "0.2.10",
-  "description": "DSH Web 界面右下角的 DeepSeek 余额小鲸鱼挂件（含今日已用、峰谷定价、随机台词、音效与每轮消耗统计）",
-  "keywords": [
-    "dsh",
-    "dsh-plugin",
-    "deepseek-harness",
-    "balance",
-    "widget"
-  ],
+  "name": "hermes-whale-widget",
+  "version": "0.1.0",
+  "private": true,
   "type": "module",
-  "main": "lib/index.js",
-  "files": [
-    "lib",
-    "assets",
-    "cordis.patch.yml",
-    "README.md"
-  ],
+  "description": "Hermes 桌面版小鲸鱼余额挂件 —— 移植自 DSH 插件 dsh-whale-widget（MeteorNOX, MIT）",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget.git"
+    "url": "git+https://github.com/K4GuR4-yhz/DeepSeek-Balance-Whale-Widget.git"
   },
-  "bugs": {
-    "url": "https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget/issues"
-  },
-  "homepage": "https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget#readme",
-  "dsh": {
-    "bundle": {
-      "patch": "./cordis.patch.yml"
-    }
+  "scripts": {
+    "check": "node --check plugin.js",
+    "set-image": "node scripts/set-whale-image.mjs"
   },
   "license": "MIT"
 }

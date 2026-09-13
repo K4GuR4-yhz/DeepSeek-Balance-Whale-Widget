@@ -10,7 +10,8 @@
   },
   "scripts": {
     "check": "node --check plugin.js",
-    "set-image": "node scripts/set-whale-image.mjs"
+    "set-image": "node scripts/set-whale-image.mjs",
+    "selfcheck": "node scripts/selfcheck.mjs"
   },
   "license": "MIT"
 }

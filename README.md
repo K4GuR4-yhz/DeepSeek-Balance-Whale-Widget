@@ -114,11 +114,23 @@ cp plugin.js "$HERMES_HOME/desktop-plugins/whale-widget/plugin.js"
 plugin.js                 # 插件本体（单文件，图片已内联）—— 这就是要装的东西
 assets/whale.png          # 鲸鱼立绘（上游 DSniang1.png，缩到 320px）
 scripts/set-whale-image.mjs  # 换图后重新内联
+scripts/selfcheck.mjs     # 离线自检（npm run selfcheck）：SDK 名字、register、记账数学、渲染
 install.ps1 / install.sh  # 安装到 $HERMES_HOME/desktop-plugins/
 skills/whale-widget/      # 给 agent 的 ::whale 用法说明（可选安装）
 legacy-dsh/               # 上游 DSH 版原文件（对照 / 同步 upstream 用，不参与 Hermes 运行）
 docs/PORTING.md           # 移植笔记：API 映射、取舍、做不了的部分
 ```
+
+## 改代码之后怎么验
+
+```bash
+npm run check        # node --check plugin.js —— 语法
+npm run selfcheck    # 离线跑一遍：SDK 导出名核对、register、记账数学、各挂件面渲染、每轮结算
+WHALE_REAL_KEY=sk-… npm run selfcheck   # 再多打一次真实 /user/balance
+```
+
+`selfcheck` 不需要装 Hermes，也不碰你的真实配置：它在一个临时目录里造一套最小 SDK 桩，
+把 `plugin.js` 当 ESM 载进来跑，连渲染树都展开检查文案。退出码非 0 就是有东西坏了。
 
 ## 上游 & 许可
 

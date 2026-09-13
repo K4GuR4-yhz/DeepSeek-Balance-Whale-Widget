@@ -17,7 +17,7 @@ Hermes 没有 cordis 配置树、没有 `ctx.webServer` / `ctx.credentials` / `s
 | 记账落盘 `.dshw-usage.json` | 宿主 fs | `ctx.storage.get/set`（插件命名空间 `hermes.plugin.whale-widget.*`） |
 | 卸载时清理 | `ctx.effect(() => () => disposers)` | `ctx.onDispose(fn)`（贡献/socket 之外的定时器、订阅清理口） |
 | 前端轮询 60s / 1s | 注入脚本里的 `setInterval` | 插件内单例 `setInterval`（15s 起，默认 60s），所有挂件面共享原子状态 |
-| 拖拽 + 四边吸附 + 左吸附镜像翻转的浮层 | DSH 页面里的自由 DOM | ❌ 做不了。Hermes 插件的贡献区域只有 statusBar / panes / palette / keybinds / themes / routes / 聊天指令，没有自由浮层 |
+| 拖拽的浮层挂件 | DSH 页面里的自由 DOM | 插件的贡献区域里没有自由浮层（只有 statusBar / panes / palette / keybinds / themes / routes / 聊天指令）。**但 Hermes 的桌宠层有**：把立绘做成 petdex 宠物后，Shift+点击即弹出透明置顶、可拖到屏幕任意位置、位置持久化的窗口（见下节）。四边吸附 / 左吸附镜像翻转没有对应物 |
 | 音效 | `/dsh-whale/sound/*.mp3` | 未实现（上游 mp3 在 `legacy-dsh/assets/`，要加就在按压处理器里 `new Audio(dataURI)`，注意默认静音） |
 
 ## 保持了上游行为的几处细节
@@ -39,6 +39,21 @@ Hermes 没有 cordis 配置树、没有 `ctx.webServer` / `ctx.credentials` / `s
 - **不加后台常驻进程**：插件随桌面端启停（进程内模型）；要脱离 Hermes 常驻得另做独立托盘程序，那是另一个项目。
 - **不常驻占位面板**：`panes` 贡献点在插件手里没有"显示"入口 —— core 的 `files`/`review` 各自绑了 ⌘B/⌘G，插件注册的 pane 只能靠拖布局找到，用户实际看到的是"什么都没有"（第一版就这么翻的车）。
   所以面板改成按需用 `host.openWorkspace` 打开：dock 在会话区右侧、重复调用只前置；只在没有该 API 的老桌面上才退回注册 pane。
+
+## 桌宠：原版那只"浮在角落的鲸鱼"其实有对应物
+
+上游最抓人的是"右下角一只可拖拽的鲸鱼"。插件的贡献区域给不了自由浮层，但 **Hermes 本身有一套桌宠层**
+（`agent/pet/*` + `apps/desktop/src/app/pet-overlay/*`）：宠物是 petdex 规格的精灵图，住在应用窗口里；
+**Shift+点击** 会把它弹进一个独立的透明置顶窗口，可以拖到屏幕任何位置（包括应用窗口外），位置持久化，
+还有单击迷你输入框 / 双击切主窗口 / Alt+滚轮缩放。所以"桌宠"这条腿不是插件实现的，是把立绘做成了宠物。
+
+- 规格：8 列 × 9 行、格子 192×208、每状态 6 帧（整图 1536×1872）。
+- 行序按 `agent/pet/constants.py` 的 `CODEX_STATE_ROWS`（行数 ≥ 9 时用现行分类，否则回退 8 行旧序）；
+  桌面端的行序来自网关的 `pet.info.stateRows`，两者必须一致，否则动作会串行 —— `scripts/make-pet.py`
+  就是按这套行序逐帧合成并校验的（空帧、被格子切顶、落点异常都会报错）。
+- 装机：文件放 `$HERMES_HOME/pets/whale/`，再 `hermes pets select whale`（写 `display.pet.slug` / `enabled`）。
+- 局限：宠物层不排版文字，余额数字进不了桌宠；数字留在状态栏 chip、面板和 `::whale` 卡片。
+- 注意这是"给 Hermes 加一只宠物"的路径，**不是插件 API**：插件上下文里没有开放桌宠的接口。
 
 ## 文件布局
 

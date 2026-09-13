@@ -1,0 +1,7 @@
+{
+  "id": "whale",
+  "displayName": "小鲸鱼",
+  "description": "一只帮你盯着 DeepSeek 余额的小鲸鱼娘（来自 DeepSeek-Balance-Whale-Widget，MIT）",
+  "spritesheetPath": "spritesheet.webp",
+  "createdBy": "hermes-whale-widget"
+}

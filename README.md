@@ -12,7 +12,8 @@
 
 | 功能 | 说明 |
 |---|---|
-| 🐳 状态栏常驻 | 余额直接显示在状态栏右侧，点击即刷新；余额低时标「低」 |
+| 🐳 状态栏常驻 | 余额直接显示在状态栏右侧，点击即打开面板并刷新；余额低时标「低」 |
+| 🧸 桌宠模式 | 同一只鲸鱼可以装成 Hermes 桌宠（petdex 规格精灵图）：窗口内四处待机，**Shift+点击弹成悬浮桌宠**——透明、总在最前、能拖到屏幕任意位置（包括 Hermes 窗口外），位置会记住 |
 | 🗂 挂件面板 | 右侧区块的一个 tab（可拖到任意区块）：余额大字、今日已用、本轮消耗、计费时段、设置 |
 | 💬 聊天内鲸鱼 | 对话里写 `::whale`（单独一行），鲸鱼卡片就画在消息里 |
 | 📊 今日已用 | **余额差值记账**（免令牌）：每次观测余额后按差值累计，只有下降才算消费；跨天归零，充值不计成负支出 |
@@ -67,6 +68,40 @@ dock 在会话区右侧。重复点击只前置，不会叠出第二个。
 
 给 agent 用：把 `skills/whale-widget/` 复制到 `$HERMES_HOME/skills/`，agent 就知道可以在回答里插 `::whale` 卡片。
 
+## 桌宠模式（就是原版那个「桌宠」效果）
+
+Hermes 自带桌宠系统（petdex 规格）：同一只小鲸鱼能当真正的桌面挂件 —— 平时住在应用窗口里
+待机，**Shift+点击** 就把它弹成一个透明、总在最前的小窗口，可以拖到屏幕任何地方（包括
+Hermes 窗口之外），位置会记住。
+
+精灵图已经在仓库里（`pets/whale/`），装它只要三步（Windows 路径换成 `%LOCALAPPDATA%\hermes\pets\whale`）：
+
+```bash
+cp pets/whale/pet.json pets/whale/spritesheet.webp "$HERMES_HOME/pets/whale/"
+hermes pets select whale      # 设为当前桌宠（写 display.pet.slug + enabled）
+hermes pets doctor            # 应看到 ✓ ready、active (resolved): whale
+```
+
+手势跟 Hermes 其它宠物一致：
+
+| 操作 | 效果 |
+|---|---|
+| **Shift+点击** | 弹出 / 收回悬浮桌宠窗口（这就是"桌宠"本体） |
+| 拖动 | 拖到屏幕任意位置，位置持久化 |
+| 单击 | 开/关迷你输入框（不切回主窗口也能发指令） |
+| 双击 | 最小化 / 恢复 Hermes 主窗口 |
+| Alt+滚轮 | 缩放（等价 `hermes pets scale 0.5`） |
+| `hermes pets off` | 关掉桌宠；想换回原来的宠物 `hermes pets select maisenpai` |
+
+规格与动作：8 列 × 9 行、格子 192×208、每状态 6 帧，行序是 petdex 现行分类
+（idle / running-right / running-left / waving / jumping / failed / waiting / running / review），
+所以鲸鱼会跟着 agent 状态换动作：干活时跑、失败时抖+掉色、等你回话时晃、闲时呼吸。
+`scripts/make-pet.py` 用同一张立绘合成这 9 组动作（位移 / 挤压 / 旋转 / 掉色），换图只要
+`python scripts/make-pet.py --art 你的鲸鱼.png`，它会逐帧校验（空帧、被格子切掉、落点异常都会报错）。
+
+> 桌宠层不排版文字，所以**它不显示余额数字**：数字归状态栏 chip、面板和 `::whale` 卡片，
+> 鲸鱼负责可爱，nya~
+
 ## 设置项
 
 | 设置 | 默认 | 说明 |
@@ -115,8 +150,10 @@ dock 在会话区右侧。重复点击只前置，不会叠出第二个。
 
 ```
 plugin.js                 # 插件本体（单文件，图片已内联）—— 这就是要装的东西
+pets/whale/               # 桌宠：pet.json + spritesheet.webp（1536x1872，8x9 格）
 assets/whale.png          # 鲸鱼立绘（上游 DSniang1.png，缩到 320px）
 scripts/set-whale-image.mjs  # 换图后重新内联
+scripts/make-pet.py       # 用立绘合成桌宠精灵图（Pillow），逐帧校验
 scripts/selfcheck.mjs     # 离线自检（npm run selfcheck）：SDK 名字、register、记账数学、渲染
 install.ps1 / install.sh  # 安装到 $HERMES_HOME/desktop-plugins/
 skills/whale-widget/      # 给 agent 的 ::whale 用法说明（可选安装）

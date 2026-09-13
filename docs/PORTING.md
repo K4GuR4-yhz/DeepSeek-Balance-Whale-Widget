@@ -11,7 +11,7 @@ Hermes 没有 cordis 配置树、没有 `ctx.webServer` / `ctx.credentials` / `s
 | 上游做的事 | 上游 API | Hermes 对应 |
 |---|---|---|
 | 注册 `/dsh-whale/balance.json` 等 8 条 HTTP 路由 | `ctx.webServer.register` | 无（渲染层直接 `fetch` DeepSeek 官方接口；CORS 可用） |
-| 往 DSH 的 index.html 注入 `<script src="/dsh-whale/widget.js">` | `ctx.webServer.tapIndex` | 无 → 改为 SDK 贡献点：状态栏 / pane / 聊天指令 |
+| 往 DSH 的 index.html 注入 `<script src="/dsh-whale/widget.js">` | `ctx.webServer.tapIndex` | 无 → 改用 SDK 贡献点：状态栏 chip + 聊天 `::whale` 指令 + ⌘K；面板走 `host.openWorkspace`（会话区右侧标签页，按需打开） |
 | 取 key | `ctx.credentials.resolve('DEEPSEEK_API_KEY')` | `host.request('config.get', {key:'full'})` 读 `custom_providers[].api_key`，或用户手填 → `ctx.storage` |
 | 监听会话事件结算每轮消耗 | `ctx.on('session/event')` | `host.state.focusedUsage`（实时 UsageStats，含 `cost_usd` / `total`）+ `host.state.busy` 忙转闲结算 |
 | 记账落盘 `.dshw-usage.json` | 宿主 fs | `ctx.storage.get/set`（插件命名空间 `hermes.plugin.whale-widget.*`） |
@@ -37,6 +37,8 @@ Hermes 没有 cordis 配置树、没有 `ctx.webServer` / `ctx.credentials` / `s
 - **不给渲染层塞 key 到源码里**：key 只走 `ctx.storage`（插件自己的本地命名空间）。
 - **不写任何 Hermes 核心配置**：不动 `config.yaml`、不动 `.env`；「从 config.yaml 读取 key」只是**读**。
 - **不加后台常驻进程**：插件随桌面端启停（进程内模型）；要脱离 Hermes 常驻得另做独立托盘程序，那是另一个项目。
+- **不常驻占位面板**：`panes` 贡献点在插件手里没有"显示"入口 —— core 的 `files`/`review` 各自绑了 ⌘B/⌘G，插件注册的 pane 只能靠拖布局找到，用户实际看到的是"什么都没有"（第一版就这么翻的车）。
+  所以面板改成按需用 `host.openWorkspace` 打开：dock 在会话区右侧、重复调用只前置；只在没有该 API 的老桌面上才退回注册 pane。
 
 ## 文件布局
 

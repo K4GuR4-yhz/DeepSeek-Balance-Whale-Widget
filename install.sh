@@ -30,6 +30,6 @@ cat <<'EOF'
 
 下一步：
   1. 桌面端几秒内自动加载；没出现就 ⌘K / Ctrl+K → "Reload desktop plugins"
-  2. 打开右侧的 whale 面板 → 设置区点「从 config.yaml 读取 key」（或手填 sk- key）
-  3. 状态栏右侧应出现 🐳 余额
+  2. 点状态栏那只 🐳（或 ⌘K → "打开小鲸鱼挂件面板"）→ 面板 dock 在会话区右侧
+  3. 面板设置区点「从 config.yaml 读取 key」（或手填 sk- key）→ 状态栏出现余额
 EOF

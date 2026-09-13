@@ -55,6 +55,9 @@ cp plugin.js "$HERMES_HOME/desktop-plugins/whale-widget/plugin.js"
 装完后桌面端几秒内自动加载；没出现就 ⌘K / Ctrl+K → **Reload desktop plugins**，
 再不行去 **设置 → Capabilities → Plugins** 看 `whale-widget` 是否被关掉了。
 
+**面板在哪**：点状态栏那只 🐳（或 ⌘K → `🐳 打开小鲸鱼挂件面板`），它会作为一个标签页
+dock 在会话区右侧。重复点击只前置，不会叠出第二个。
+
 ## 用起来
 
 1. 打开挂件面板（状态栏鲸鱼点一下只是刷新；面板在右侧区块的 `whale` tab，或被自动放到右侧区域），

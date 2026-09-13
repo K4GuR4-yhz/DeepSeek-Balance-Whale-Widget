@@ -53,7 +53,11 @@ export const host = {
   notify: msg => { (globalThis.__WHALE_NOTIFS__ ??= []).push(msg) },
   request: async () => ({ config: globalThis.__WHALE_CONFIG__ ?? {} }),
   onEvent: () => () => {},
-  logs: () => {}
+  logs: () => {},
+  openWorkspace: (id, options) => {
+    ;(globalThis.__WHALE_OPENED__ ??= []).push({ id, options })
+    return () => {}
+  }
 }
 export const useValue = a => (a && typeof a.get === 'function' ? a.get() : a)
 export const usePluginI18n = () => (key, ...args) => {
@@ -302,10 +306,18 @@ check('初始观测写入账本', bag.store.ledger?.currency === 'CNY' && bag.st
   check('跨天账本归零', bag.store.ledger.spent === 0 && bag.store.ledger.date !== '2020-01-01', JSON.stringify(bag.store.ledger))
 }
 
-// 面板 / 聊天卡片 / ⌘K
+// 面板入口 / 聊天卡片 / ⌘K
 {
   bag = await scenario({ fixtures: [balanceFixture('CNY', 53.22)] })
-  const paneText = treeText(bag.contribs.find(c => c.id === 'pane').render()).replace(/\s+/g, ' ')
+  globalThis.__WHALE_OPENED__ = []
+  findHandler(bag.contribs.find(c => c.id === 'chip').render(), 'onClick')()
+  const opened = globalThis.__WHALE_OPENED__[0]
+  check(
+    '点鲸鱼以右侧 workspace 标签页打开面板',
+    opened?.id === 'whale-widget:panel' && opened.options.dock?.pos === 'right' && typeof opened.options.render === 'function',
+    opened ? `${opened.id} dock=${opened.options.dock?.pos}` : 'not opened'
+  )
+  const paneText = treeText(opened.options.render()).replace(/\s+/g, ' ')
   check(
     '面板渲染中文标签与余额',
     paneText.includes('今日已用') && paneText.includes('本轮消耗') && paneText.includes('53.22') && !paneText.includes('render-error'),

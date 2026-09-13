@@ -348,9 +348,10 @@ function WhaleChip() {
     label: tip,
     children: jsx('button', {
       type: 'button',
+      // 主点击 = 打开/前置面板（顺带刷新）；刷新按钮在面板里，⌘K 也有独立行
       onClick: () => {
-        haptic('tap')
         void observe()
+        openPanel()
       },
       className: cn(
         'inline-flex h-full items-center gap-1 px-1.5 text-[0.6875rem] transition-colors',
@@ -363,6 +364,44 @@ function WhaleChip() {
       ].filter(Boolean)
     })
   })
+}
+
+// ── 面板入口 ────────────────────────────────────────────────────────────────
+
+let ctxRef = null
+let paneRegistered = false
+
+/**
+ * 面板的正式门是 host.openWorkspace：dock 在会话区右侧，重复调用只前置、不叠 tab。
+ * 没有它（老桌面）就退回注册一个普通 pane —— 但那种 pane 没有"显示"入口，
+ * 只能靠 ⌘K/重置布局找，所以只是兜底。
+ */
+function openPanel() {
+  haptic('tap')
+  try {
+    if (typeof host.openWorkspace === 'function') {
+      host.openWorkspace(`${ID}:panel`, {
+        title: 'whale',
+        minWidth: '15rem',
+        dock: { pane: 'workspace', pos: 'right' },
+        render: () => jsx(WhalePane, {})
+      })
+      return
+    }
+  } catch (_err) {}
+  if (!paneRegistered && ctxRef) {
+    paneRegistered = true
+    try {
+      ctxRef.register({
+        id: 'pane',
+        area: 'panes',
+        title: 'whale',
+        data: { placement: 'right', collapsible: true, dock: { pane: 'workspace', pos: 'right' }, width: '260px' },
+        render: () => jsx(WhalePane, {})
+      })
+    } catch (_err) {}
+  }
+  host.notify({ kind: 'info', message: '小鲸鱼面板在会话区右侧的 whale 标签页（⌘K → 打开小鲸鱼挂件）' })
 }
 
 // ── 台词（随日期与余额变化，不跑定时器）───────────────────────────────────────
@@ -707,7 +746,7 @@ export default {
         tipPeak: kind => `rate: ${kind}`,
         tipUpdated: at => `updated ${at}`,
         tipError: code => `error ${code}`,
-        tipRefresh: 'click to refresh',
+        tipRefresh: 'click to open the panel & refresh',
         quip1: 'Watching the balance so you do not have to~',
         quip2: 'Every refill makes my tail wag.',
         quip3: 'Off-peak hours are the cheap hours.',
@@ -748,7 +787,7 @@ export default {
         tipPeak: kind => `时段：${kind}`,
         tipUpdated: at => `更新于 ${at}`,
         tipError: code => `错误 ${code}`,
-        tipRefresh: '点击刷新',
+        tipRefresh: '点击打开面板并刷新',
         quip1: '余额我替你盯着，你专心写代码就好~',
         quip2: '每次充值我尾巴都摇起来了。',
         quip3: '谷价时段才是最香的时段。',
@@ -764,14 +803,9 @@ export default {
       render: () => jsx(WhaleChip, {})
     })
 
-    // 挂件面板：右侧区域的一个 tab，可拖到任意区块
-    ctx.register({
-      id: 'pane',
-      area: 'panes',
-      title: 'whale',
-      data: { placement: 'right', width: '260px' },
-      render: () => jsx(WhalePane, {})
-    })
+    // 面板不在启动时就占位：它是按需打开的 workspace 标签页（openPanel）。
+    // openPanel 在老桌面上的兜底 pane 也用这个 ctx 注册。
+    ctxRef = ctx
 
     // 聊天内 ::whale
     ctx.register({
@@ -780,7 +814,23 @@ export default {
       data: { name: 'whale', render: () => jsx(WhaleDirective, {}) }
     })
 
-    // ⌘K 命令
+    // ⌘K 命令：打开面板 / 刷新余额
+    ctx.register({
+      id: 'cmd-open',
+      area: PALETTE_AREA,
+      data: {
+        id: 'whale-widget-open',
+        label: '🐳 打开小鲸鱼挂件面板',
+        keywords: ['whale', 'panel', 'deepseek', '面板', '鲸鱼', '余额'],
+        detail: () => {
+          const b = $balance.get()
+          return b ? `${b.currency === 'CNY' ? '¥' : ''}${money(b.total)}` : '—'
+        },
+        detailVariant: 'state',
+        run: () => openPanel()
+      }
+    })
+
     ctx.register({
       id: 'cmd-refresh',
       area: PALETTE_AREA,

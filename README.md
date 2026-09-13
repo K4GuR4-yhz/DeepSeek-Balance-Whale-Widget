@@ -68,7 +68,36 @@ dock 在会话区右侧。重复点击只前置，不会叠出第二个。
 
 给 agent 用：把 `skills/whale-widget/` 复制到 `$HERMES_HOME/skills/`，agent 就知道可以在回答里插 `::whale` 卡片。
 
-## 桌宠模式（就是原版那个「桌宠」效果）
+## 桌宠 A：独立小部件窗口（原版复刻，推荐）
+
+这才是原版那只「住在桌面角落、可拖拽、点一下会说话」的鲸鱼：一个独立进程的透明置顶小窗口，
+不依赖插件或宠物层，能拖到屏幕任何地方、四边吸附、左吸附镜像翻转。
+
+**启动**：双击 `pet\启动小鲸鱼.vbs`（静默，不弹控制台窗口）。
+
+| 操作 | 行为 |
+|---|---|
+| 单击鲸鱼 | 刷新余额 + 弹气泡（余额 / 今日已用 / 峰谷）；气泡开着时再点一下 = 换一句台词 |
+| 拖动 | 拖到屏幕任意位置，松手时距屏幕边缘 28px 内自动吸附 |
+| 吸附到左边 | 鲸鱼水平镜像翻转（原版行为） |
+| 右键 | 菜单：大小（0.6–2.5x，原版同档）、音效、气泡、立即刷新余额、回右下角、退出 |
+| 气泡 | 5 秒自动收起（原版同） |
+| 余额 | 每 60 秒刷新一次；网络抖动沿用上次余额、不清空 |
+| 数据 | 只**读** Hermes 的 `config.yaml` 取 DeepSeek key；位置/缩放/记账本写在 `$HERMES_HOME/cache/whale-pet/state.json` |
+
+自检（不用人眼盯）：`python pet\whale-pet.pyw --self-test` —— 建真窗口跑 5 种吸附状态 × 3 档缩放的
+几何不变量、气泡折行、记账边界、并从 Hermes 配置取 key 真打一次接口，10/10 才算通过。
+
+开机自启（可选，静默计划任务）：
+
+```powershell
+schtasks /Create /TN "小鲸鱼桌宠" /SC ONLOGON /RL LIMITED /F /TR "wscript.exe \"E:\DeepSeek-Balance-Whale-Widget\pet\启动小鲸鱼.vbs\""
+```
+
+关掉：右键 → 退出（或 `taskkill /IM pythonw.exe /F`）。跟下面的内置宠物同时开会有点重叠，
+二选一就好。
+
+## 桌宠 B：Hermes 内置宠物（petdex）
 
 Hermes 自带桌宠系统（petdex 规格）：同一只小鲸鱼能当真正的桌面挂件 —— 平时住在应用窗口里
 待机，**Shift+点击** 就把它弹成一个透明、总在最前的小窗口，可以拖到屏幕任何地方（包括
@@ -150,7 +179,9 @@ hermes pets doctor            # 应看到 ✓ ready、active (resolved): whale
 
 ```
 plugin.js                 # 插件本体（单文件，图片已内联）—— 这就是要装的东西
-pets/whale/               # 桌宠：pet.json + spritesheet.webp（1536x1872，8x9 格）
+pet/whale-pet.pyw         # 桌宠 A：原版复刻的独立小部件窗口（Tk）+ 启动小鲸鱼.vbs 静默启动器
+pet/sounds/               # 按压音效（上游 mp3 转 wav）
+pets/whale/               # 桌宠 B：petdex 精灵图 pet.json + spritesheet.webp（1536x1872，8x9 格）
 assets/whale.png          # 鲸鱼立绘（上游 DSniang1.png，缩到 320px）
 scripts/set-whale-image.mjs  # 换图后重新内联
 scripts/make-pet.py       # 用立绘合成桌宠精灵图（Pillow），逐帧校验

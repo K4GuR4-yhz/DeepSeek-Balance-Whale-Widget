@@ -1,210 +1,98 @@
-# Hermes 小鲸鱼余额挂件
+# Hermes 小鲸鱼余额（状态栏版）
 
 ![小鲸鱼](assets/whale.png)
 
-一只住在 **Hermes 桌面版**状态栏里的小鲸鱼娘，帮你盯着 DeepSeek 账户余额 😺
+一只趴在 **Hermes 状态栏**上的小鲸鱼，帮你盯着 DeepSeek 余额 😺
 
 移植自 DSH 插件 [`dsh-whale-widget`](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)（MeteorNOX，MIT）。
-上游是 DeepSeek Harness 的宿主插件 + 页面注入脚本；这里按 Hermes 桌面版插件 SDK 重写，
-单文件、热重载、无独立进程。鲸鱼立绘与音效沿用上游 MIT 资源。
+**当前形态只做一件事**：状态栏右侧常驻余额，点击刷新，悬停看细节。
+面板 / 浮层桌宠 / 内置宠物那些形态在历史提交与本仓库 `pet/`、`pets/` 里，**不在当前安装里**。
 
 ## 功能
 
 | 功能 | 说明 |
 |---|---|
-| 🐳 状态栏常驻 | 余额直接显示在状态栏右侧，点击即打开面板并刷新；余额低时标「低」 |
-| 🧸 桌宠模式 | 同一只鲸鱼可以装成 Hermes 桌宠（petdex 规格精灵图）：窗口内四处待机，**Shift+点击弹成悬浮桌宠**——透明、总在最前、能拖到屏幕任意位置（包括 Hermes 窗口外），位置会记住 |
-| 🗂 挂件面板 | 右侧区块的一个 tab（可拖到任意区块）：余额大字、今日已用、本轮消耗、计费时段、设置 |
-| 💬 聊天内鲸鱼 | 对话里写 `::whale`（单独一行），鲸鱼卡片就画在消息里 |
-| 📊 今日已用 | **余额差值记账**（免令牌）：每次观测余额后按差值累计，只有下降才算消费；跨天归零，充值不计成负支出 |
-| 💵 本轮消耗 | 读 Hermes 会话 usage（`cost_usd` + tokens），按会话分桶，不跟子代理串账 |
-| 💬 消耗提示 | 可选：每轮对话结束弹一条「本轮 $x.xxxx · N tokens · 今日 ¥y」 |
-| ⏰ 峰谷时段 | 工作日 9:00–12:00 / 14:00–18:00 判定为高峰（北京时间），2026-08-23 起周末全天谷价 |
-| ⌘K 命令 | `🐳 刷新 DeepSeek 余额`，详情行显示当前余额 |
-| 🎛 设置 | key、刷新间隔、低价阈值、状态栏开关、消耗提示开关，全部本地持久化（插件命名空间，不写 config.yaml） |
+| 🐳 状态栏余额 | `🐳 ¥52.42`，余额低于阈值时标「低」；点击立刻刷新 |
+| 悬停细节 | 余额 · 今日已用 · 计费时段（高峰/谷价）· 更新时间 · 出错时的错误码 |
+| 🔑 零配置 key | 首次运行自动从你的 `config.yaml` 读 DeepSeek 的 `sk-` key（只读，不写配置） |
+| 📊 今日已用 | 余额差值记账（免令牌）：只有余额下降才算消费，充值不计负支出，跨天归零，币种切换整本重置 |
+| ⏱ 自动刷新 | 默认 60 秒（15–3600 可调），网络抖动沿用上次余额、不清空 |
+| ⌘K | `Ctrl+K` → `🐳 刷新 DeepSeek 余额` / `🐳 从 config.yaml 重读 DeepSeek key` |
 
 ## 安装
 
-前提：**Hermes 桌面版**（`hermes desktop`）。插件目录是 `$HERMES_HOME/desktop-plugins/<id>/plugin.js`，
+前提：**Hermes 桌面版**。插件目录是 `$HERMES_HOME/desktop-plugins/<id>/plugin.js`，
 Windows 默认 `C:\Users\<你>\AppData\Local\hermes\desktop-plugins\`。
 
-### 一键（Windows PowerShell）
-
-```powershell
-git clone https://github.com/K4GuR4-yhz/DeepSeek-Balance-Whale-Widget.git
-cd DeepSeek-Balance-Whale-Widget
-pwsh -File install.ps1
-```
-
-### 一键（Linux / macOS / git-bash）
-
 ```bash
 git clone https://github.com/K4GuR4-yhz/DeepSeek-Balance-Whale-Widget.git
 cd DeepSeek-Balance-Whale-Widget
-bash install.sh
+bash install.sh          # Windows: pwsh -File install.ps1
 ```
 
-### 手动
+装完后桌面端几秒内自动加载（没出现就 `Ctrl+K` → **Reload desktop plugins**）。
+状态栏右侧应该出现 `🐳 ¥…`；如果显示 `🐳 未配 key`，说明 `config.yaml` 里没有 DeepSeek 的 key，
+见下面的「设置」。
 
-把 `plugin.js` 放进 `desktop-plugins/whale-widget/plugin.js`（**目录名必须等于插件 id `whale-widget`**）：
+## 设置
 
-```bash
-mkdir -p "$HERMES_HOME/desktop-plugins/whale-widget"
-cp plugin.js "$HERMES_HOME/desktop-plugins/whale-widget/plugin.js"
-```
+设置只有四个值，没有设置界面（保持状态栏这一个面）—— 存在插件自己的本地命名空间里，
+默认值是：`apiKey`（自动从 config.yaml 读）、`baseUrl` = `https://api.deepseek.com`、
+`refreshSec` = 60、`lowBalance` = 10。
 
-装完后桌面端几秒内自动加载；没出现就 ⌘K / Ctrl+K → **Reload desktop plugins**，
-再不行去 **设置 → Capabilities → Plugins** 看 `whale-widget` 是否被关掉了。
-
-**面板在哪**：点状态栏那只 🐳（或 ⌘K → `🐳 打开小鲸鱼挂件面板`），它会作为一个标签页
-dock 在会话区右侧。重复点击只前置，不会叠出第二个。
-
-## 用起来
-
-1. 打开挂件面板（状态栏鲸鱼点一下只是刷新；面板在右侧区块的 `whale` tab，或被自动放到右侧区域），
-2. 设置区点 **从 config.yaml 读取 key** —— 直接拿 Hermes 已配置的 DeepSeek key（不落盘、不新写配置）；
-   也可以手动粘 `sk-` key，点保存。
-3. 面板顶部鲸鱼头点一下 = 手动刷新。之后每 60 秒自动刷新（间隔可改，最小 15 秒）。
-
-给 agent 用：把 `skills/whale-widget/` 复制到 `$HERMES_HOME/skills/`，agent 就知道可以在回答里插 `::whale` 卡片。
-
-## 桌宠 A：独立小部件窗口（原版复刻，推荐）
-
-这才是原版那只「住在桌面角落、可拖拽、点一下会说话」的鲸鱼：一个独立进程的透明置顶小窗口，
-不依赖插件或宠物层，能拖到屏幕任何地方、四边吸附、左吸附镜像翻转。
-
-**启动**：双击 `pet\启动小鲸鱼.vbs`（静默，不弹控制台窗口）。
-
-| 操作 | 行为 |
-|---|---|
-| 单击鲸鱼 | 刷新余额 + 弹气泡（余额 / 今日已用 / 峰谷）；气泡开着时再点一下 = 换一句台词 |
-| 拖动 | 拖到屏幕任意位置，松手时距屏幕边缘 28px 内自动吸附 |
-| 吸附到左边 | 鲸鱼水平镜像翻转（原版行为） |
-| 右键 | 菜单：大小（0.6–2.5x，原版同档）、音效、气泡、立即刷新余额、回右下角、退出 |
-| 气泡 | 5 秒自动收起（原版同） |
-| 余额 | 每 60 秒刷新一次；网络抖动沿用上次余额、不清空 |
-| 数据 | 只**读** Hermes 的 `config.yaml` 取 DeepSeek key；位置/缩放/记账本写在 `$HERMES_HOME/cache/whale-pet/state.json` |
-
-自检（不用人眼盯）：`python pet\whale-pet.pyw --self-test` —— 建真窗口跑 5 种吸附状态 × 3 档缩放的
-几何不变量、气泡折行、记账边界、并从 Hermes 配置取 key 真打一次接口，10/10 才算通过。
-
-开机自启（可选，静默计划任务）：
-
-```powershell
-schtasks /Create /TN "小鲸鱼桌宠" /SC ONLOGON /RL LIMITED /F /TR "wscript.exe \"E:\DeepSeek-Balance-Whale-Widget\pet\启动小鲸鱼.vbs\""
-```
-
-关掉：右键 → 退出（或 `taskkill /IM pythonw.exe /F`）。跟下面的内置宠物同时开会有点重叠，
-二选一就好。
-
-## 桌宠 B：Hermes 内置宠物（petdex）
-
-Hermes 自带桌宠系统（petdex 规格）：同一只小鲸鱼能当真正的桌面挂件 —— 平时住在应用窗口里
-待机，**Shift+点击** 就把它弹成一个透明、总在最前的小窗口，可以拖到屏幕任何地方（包括
-Hermes 窗口之外），位置会记住。
-
-精灵图已经在仓库里（`pets/whale/`），装它只要三步（Windows 路径换成 `%LOCALAPPDATA%\hermes\pets\whale`）：
-
-```bash
-cp pets/whale/pet.json pets/whale/spritesheet.webp "$HERMES_HOME/pets/whale/"
-hermes pets select whale      # 设为当前桌宠（写 display.pet.slug + enabled）
-hermes pets doctor            # 应看到 ✓ ready、active (resolved): whale
-```
-
-手势跟 Hermes 其它宠物一致：
-
-| 操作 | 效果 |
-|---|---|
-| **Shift+点击** | 弹出 / 收回悬浮桌宠窗口（这就是"桌宠"本体） |
-| 拖动 | 拖到屏幕任意位置，位置持久化 |
-| 单击 | 开/关迷你输入框（不切回主窗口也能发指令） |
-| 双击 | 最小化 / 恢复 Hermes 主窗口 |
-| Alt+滚轮 | 缩放（等价 `hermes pets scale 0.5`） |
-| `hermes pets off` | 关掉桌宠；想换回原来的宠物 `hermes pets select maisenpai` |
-
-规格与动作：8 列 × 9 行、格子 192×208、每状态 6 帧，行序是 petdex 现行分类
-（idle / running-right / running-left / waving / jumping / failed / waiting / running / review），
-所以鲸鱼会跟着 agent 状态换动作：干活时跑、失败时抖+掉色、等你回话时晃、闲时呼吸。
-`scripts/make-pet.py` 用同一张立绘合成这 9 组动作（位移 / 挤压 / 旋转 / 掉色），换图只要
-`python scripts/make-pet.py --art 你的鲸鱼.png`，它会逐帧校验（空帧、被格子切掉、落点异常都会报错）。
-
-> 桌宠层不排版文字，所以**它不显示余额数字**：数字归状态栏 chip、面板和 `::whale` 卡片，
-> 鲸鱼负责可爱，nya~
-
-## 设置项
-
-| 设置 | 默认 | 说明 |
-|---|---|---|
-| API key | 空 | `api.deepseek.com` 的 `sk-` key；只存在插件自己的本地命名空间 |
-| 刷新间隔 | 60 秒 | 15–3600；余额下降靠这个节奏记账 |
-| 低于此值提醒 | 10 | 状态栏与面板金额转为强调色，并标「低」 |
-| 状态栏常驻 | 开 | 关掉后只剩面板 / 聊天卡片 |
-| 每轮消耗弹提示 | 关 | 打开后每轮结束弹一条 toast |
+- **换 key**：改 `config.yaml` 里 `custom_providers` 的 DeepSeek `api_key`，然后 `Ctrl+K` →
+  `🐳 从 config.yaml 重读 DeepSeek key`。
+- **改刷新间隔/阈值**：想改就直接改 `plugin.js` 顶部的 `DEFAULT_SETTINGS`（保存即热重载）。
+  已经存进本地状态的值优先于默认值，要让它回默认就把插件在 **设置 → Capabilities → Plugins** 里关掉重开，
+  或用 `Ctrl+K` 的 ⌘K 命令重新读一次 key。
 
 ## 数据口径
 
-- **余额**：`GET https://api.deepseek.com/user/balance`，`Authorization: Bearer sk-…`（DeepSeek 官方接口）。
-  网络抖动时沿用最近一次成功值，不会把 UI 打回空值。
-- **今日已用**：本地记账，不是平台用量接口。口径 = 今日余额下降之和，跨天归零；币种变化只重置基准不记差值
-  （避免 CNY↔USD 跳变记出假账 —— 上游 issue #13 的同款坑）。
-  注意：**中途充值不会抵消已记的已用**，这正是想要的；但如果你今天手工改过账户金额，记账会跟着偏。
-- **本轮消耗**：Hermes 上报的会话 usage（`cost_usd`、`total` tokens），按会话 id 分桶，
-  以 `busy` 由忙转闲为界结算一轮。金额单位是 Hermes 报的 USD，和账户 CNY 余额不是一套口径，所以分开显示。
+- **余额**：`GET https://api.deepseek.com/user/balance`，`Authorization: Bearer sk-…`（官方接口）。
+- **今日已用**：本地记账 = 今日余额下降之和，跨天归零；中途充值不会抵消已用。
+  口径是"钱少了多少"，不是平台用量接口的数字。
+- **失败语义**：网络抖动沿用最近一次成功值，只在 tooltip 里标错误码（`HTTP_401` = key 不对/撤销）。
 
-## 与原版的差异
+## 验证
 
-| 上游 DSH 版 | 本 Hermes 版 |
-|---|---|
-| 宿主侧插件：`ctx.webServer.register` 8 条路由 + `ctx.webServer.tapIndex` 注入脚本 | 桌面插件 SDK：状态栏贡献 + pane + 聊天指令 + ⌘K 命令（无服务端、无注入） |
-| 需 `DEEPSEEK_PLATFORM_TOKEN` 才能算今日已用（会话令牌，会过期） | 只靠余额差值记账，**不需要任何令牌** |
-| 前端脚本轮询 `/dsh-whale/*.json` | 插件内单例轮询，所有挂件面共享同一份状态 |
-| 拖拽 + 四边吸附 + 左吸附镜像翻转的浮层 | ❌ 做不了：Hermes 插件只能注册状态栏 / pane / ⌘K / 快捷键 / 主题，没有自由浮层 API |
-| 音效（小黄鸭 / 音效1） | 暂未实现（上游 mp3 保留在 `legacy-dsh/assets/`，想要可以加） |
-| 随机台词 | 保留了 4 句，按日期+余额轮换（不跑定时器） |
-| `dsh plugin add` 安装 | `install.ps1` / `install.sh` 复制到 `desktop-plugins/` |
+```bash
+npm run check        # node --check plugin.js —— 语法
+npm run selfcheck    # 离线 17 项：SDK 导出名、register 贡献点、自动读 key、记账边界、状态栏渲染、⌘K 行
+WHALE_REAL_KEY=sk-… npm run selfcheck   # 再多打一次真实 /user/balance
+```
 
-完整对照（含 API 映射与取舍）见 [`docs/PORTING.md`](docs/PORTING.md)。
-
-## 常见问题
-
-- **状态栏没鲸鱼**：`设置 → Capabilities → Plugins` 里确认 `whale-widget` 是开的；或 ⌘K → Reload desktop plugins。
-- **鲸鱼显示「未配 key」**：面板里点「从 config.yaml 读取 key」，或手动粘贴。
-- **余额取不到（`HTTP_401`）**：key 不对或已撤销；`HTTP_403` 多为该 key 无权读取余额接口（换成主账号 key）。
-- **今日已用是 0**：记账需要两次观测之间的余额下降，刚装上的头一分钟当然是 0。
-- **改了 `plugin.js` 不生效**：保存即热重载，不需要重启；如果文件写坏了，桌面端会弹加载失败 toast，按提示改回去。
-- **换了鲸鱼图**：把新 PNG 放到 `assets/whale.png` 后 `npm run set-image`（= `node scripts/set-whale-image.mjs`），
-  它会重新内联进 `plugin.js`（桌面插件只能加载单文件，图片必须走 data URI）。
+`selfcheck` 不需要装 Hermes、不碰你的真实配置：它在临时目录造一套最小 SDK 桩，
+把 `plugin.js` 当 ESM 载进来跑，连渲染文案和 tooltip 都检查。退出码非 0 就是坏了。
 
 ## 仓库结构
 
 ```
-plugin.js                 # 插件本体（单文件，图片已内联）—— 这就是要装的东西
-pet/whale-pet.pyw         # 桌宠 A：原版复刻的独立小部件窗口（Tk）+ 启动小鲸鱼.vbs 静默启动器
-pet/sounds/               # 按压音效（上游 mp3 转 wav）
-pets/whale/               # 桌宠 B：petdex 精灵图 pet.json + spritesheet.webp（1536x1872，8x9 格）
-assets/whale.png          # 鲸鱼立绘（上游 DSniang1.png，缩到 320px）
-scripts/set-whale-image.mjs  # 换图后重新内联
-scripts/make-pet.py       # 用立绘合成桌宠精灵图（Pillow），逐帧校验
-scripts/selfcheck.mjs     # 离线自检（npm run selfcheck）：SDK 名字、register、记账数学、渲染
-install.ps1 / install.sh  # 安装到 $HERMES_HOME/desktop-plugins/
-skills/whale-widget/      # 给 agent 的 ::whale 用法说明（可选安装）
-legacy-dsh/               # 上游 DSH 版原文件（对照 / 同步 upstream 用，不参与 Hermes 运行）
-docs/PORTING.md           # 移植笔记：API 映射、取舍、做不了的部分
+plugin.js                 # ← 唯一要装的东西（单文件，13KB，无外部资源）
+install.ps1 / install.sh  # 复制到 $HERMES_HOME/desktop-plugins/whale-widget/
+scripts/selfcheck.mjs     # 离线自检（npm run selfcheck）
+skills/whale-widget/      # 可选：给 agent 的 ::whale 用法说明（当前插件没注册这个指令）
+docs/PORTING.md           # 移植笔记：上游 API 映射、取舍、踩过的坑
+
+# —— 以下是历史形态，未安装，留着备用 ——
+pet/whale-pet.pyw + 启动小鲸鱼.vbs   # 桌宠 A：原版复刻的独立浮层窗口（Tk，可拖拽/吸附/气泡）
+pets/whale/               # 桌宠 B：petdex 精灵图（Hermes 内置宠物用）
+scripts/make-pet.py       # 用立绘合成精灵图（Pillow，逐帧校验）
+assets/whale.png          # 鲸鱼立绘（上游 DSniang1.png）
+legacy-dsh/               # 上游 DSH 版原文件（对照 / 同步 upstream 用）
 ```
 
-## 改代码之后怎么验
+> `install.sh --with-pet` / `install.ps1 -WithPet` 仍可把桌宠 B 装上（会启用宠物层），
+> `pet\启动小鲸鱼.vbs` 双击可跑桌宠 A。当前都不需要，故未启用。
 
-```bash
-npm run check        # node --check plugin.js —— 语法
-npm run selfcheck    # 离线跑一遍：SDK 导出名核对、register、记账数学、各挂件面渲染、每轮结算
-WHALE_REAL_KEY=sk-… npm run selfcheck   # 再多打一次真实 /user/balance
-```
+## 常见问题
 
-`selfcheck` 不需要装 Hermes，也不碰你的真实配置：它在一个临时目录里造一套最小 SDK 桩，
-把 `plugin.js` 当 ESM 载进来跑，连渲染树都展开检查文案。退出码非 0 就是有东西坏了。
+- **状态栏没有鲸鱼**：`设置 → Capabilities → Plugins` 里确认 `whale-widget` 是开的；或 `Ctrl+K` → Reload desktop plugins。
+- **显示「未配 key」**：`config.yaml` 里没有 `custom_providers` 的 DeepSeek 条目，或 key 不是 `sk-` 开头。
+- **tooltip 里是 `HTTP_401`**：key 失效/被撤销；`HTTP_403` 多为该 key 无权读余额接口。
+- **今日已用一直是 0**：它靠两次观测之间的余额下降，刚装上那会儿当然是 0。
+- **改了 `plugin.js` 不生效**：保存即热重载；写坏了桌面端会弹加载失败 toast，按提示改回来。
 
 ## 上游 & 许可
 
 - 原项目：[MeteorNOX/DeepSeek-Balance-Whale-Widget](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget)（MIT）
-- 本仓库是它的 fork + Hermes 桌面版移植，MIT 双版权见 [`LICENSE`](LICENSE)。
-- `legacy-dsh/` 下的文件版权归原作者，未做改动。
+- 本仓库是它的 fork + Hermes 移植，MIT 双版权见 [`LICENSE`](LICENSE)；`legacy-dsh/` 下文件版权归原作者。

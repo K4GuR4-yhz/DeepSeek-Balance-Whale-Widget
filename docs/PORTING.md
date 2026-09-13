@@ -1,4 +1,9 @@
-# 移植笔记：DSH 插件 → Hermes 桌面插件
+# 移植笔记：DSH 插件 → Hermes 状态栏余额
+
+> **当前形态**：只剩状态栏那一个面（余额 + tooltip + 点击刷新 + 自动读 key）。
+> 面板（`host.openWorkspace` 标签页）、聊天 `::whale` 指令、桌宠 A（独立浮层窗口）、
+> 桌宠 B（petdex 内置宠物）都做过并验证过，按用户要求**不再安装**，代码留在仓库历史与
+> `pet/`、`pets/` 目录里备查。下面每节都保留了当时的取舍与坑，重建这些形态时直接用。
 
 上游 [`dsh-whale-widget`](https://github.com/MeteorNOX/DeepSeek-Balance-Whale-Widget) 是
 DeepSeek Harness 的 bundle 插件（cordis 契约：`export { name, inject, apply }`，

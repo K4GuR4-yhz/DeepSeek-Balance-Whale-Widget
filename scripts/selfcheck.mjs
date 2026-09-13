@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
  * 离线自检：在 node 里加载 plugin.js（用最小 SDK 桩），跑通 register、记账数学、
- * 各挂件面渲染、每轮消耗结算；顺手核对 import 的 SDK 名字是否真实存在。
+ * 状态栏渲染、⌘K 行，并核对 import 的 SDK 名字是否真实存在。
  *
- *   npm run selfcheck                 # 全离线
+ *   npm run selfcheck                       # 全离线
  *   WHALE_REAL_KEY=sk-… npm run selfcheck   # 额外打一次真实 /user/balance
  *
- * 装不上、改坏了、想确认要不要 commit 之前都跑一下。退出码 0 = 全过。
+ * 装不上、改坏了、commit 之前都跑一下。退出码 0 = 全过。
  */
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -15,7 +15,7 @@ import { pathToFileURL } from 'node:url'
 
 const repo = resolve(dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..')
 
-// ── 找 Hermes 源码（只用来核对 SDK 导出名；找不到就跳过那两项）─────────────────
+// ── 找 Hermes 源码（只为核对 SDK 导出名；找不到就跳过那两项）───────────────────
 function findSdkSource() {
   const candidates = [
     process.env.HERMES_SRC && join(process.env.HERMES_SRC, 'apps/desktop/src/sdk/index.ts'),
@@ -32,7 +32,7 @@ function findSdkSource() {
   return null
 }
 
-// ── 工作目录 + SDK 桩 ───────────────────────────────────────────────────────
+// ── 临时工作目录 + SDK 桩 ───────────────────────────────────────────────────
 const work = mkdtempSync(join(tmpdir(), 'whale-selfcheck-'))
 
 const SDK_STUB = `
@@ -49,15 +49,11 @@ export function atom(initial) {
 }
 export const computed = fn => ({ get: fn })
 export const host = {
-  state: { focusedSessionId: atom('sess-1'), focusedUsage: atom(null), busy: atom(false) },
+  state: {},
   notify: msg => { (globalThis.__WHALE_NOTIFS__ ??= []).push(msg) },
   request: async () => ({ config: globalThis.__WHALE_CONFIG__ ?? {} }),
   onEvent: () => () => {},
-  logs: () => {},
-  openWorkspace: (id, options) => {
-    ;(globalThis.__WHALE_OPENED__ ??= []).push({ id, options })
-    return () => {}
-  }
+  logs: () => {}
 }
 export const useValue = a => (a && typeof a.get === 'function' ? a.get() : a)
 export const usePluginI18n = () => (key, ...args) => {
@@ -68,17 +64,9 @@ export const usePluginI18n = () => (key, ...args) => {
 }
 export const cn = (...parts) => parts.filter(Boolean).join(' ')
 export const haptic = () => {}
-export const Badge = 'Badge'
-export const Button = 'Button'
-export const Input = 'Input'
-export const Switch = 'Switch'
-export const Separator = 'Separator'
 export const Tip = 'Tip'
-export const Tooltip = 'Tooltip'
 export const STATUSBAR_AREAS = { left: 'statusBar.left', right: 'statusBar.right' }
-export const PANES_AREA = 'panes'
 export const PALETTE_AREA = 'palette'
-export const TRANSCRIPT_DIRECTIVE_AREA = 'transcript-directive'
 `
 
 const REACT_STUB = `
@@ -231,15 +219,43 @@ function findHandler(node, key, depth = 0) {
   return node.props ? findHandler(node.props.children, key, depth + 1) : null
 }
 
-async function scenario({ fixtures, presetStore = {} }) {
+/** 在渲染树里找第一个带该 prop 的节点（会展开函数组件），返回它的值。 */
+function findProp(node, key, depth = 0) {
+  if (!node || typeof node !== 'object' || depth > 12) return undefined
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const hit = findProp(child, key, depth + 1)
+      if (hit !== undefined) return hit
+    }
+    return undefined
+  }
+  if (node.props && node.props[key] !== undefined) return node.props[key]
+  if (typeof node.type === 'function') {
+    try {
+      const hit = findProp(node.type(node.props ?? {}), key, depth + 1)
+      if (hit !== undefined) return hit
+    } catch (_err) {
+      return undefined
+    }
+  }
+  return node.props ? findProp(node.props.children, key, depth + 1) : undefined
+}
+
+/** 起一个插件实例：fixtures 顺序喂给 fetch；configKey 走 host.request 的假配置。 */
+async function scenario({ fixtures, presetStore = {}, configKey = 'sk-from-config' }) {
   let call = 0
-  globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => fixtures[Math.min(call++, fixtures.length - 1)] })
+  globalThis.__WHALE_FETCHES__ = []
+  globalThis.fetch = async (url, options) => {
+    globalThis.__WHALE_FETCHES__.push({ url: String(url), auth: String((options && options.headers && options.headers.Authorization) || '') })
+    return { ok: true, status: 200, json: async () => fixtures[Math.min(call++, fixtures.length - 1)] }
+  }
+  globalThis.__WHALE_CONFIG__ = configKey ? { custom_providers: [{ base_url: 'https://api.deepseek.com', api_key: configKey }] } : {}
   const bag = makeCtx()
+  if (presetStore.settings) bag.ctx.storage.set('settings', presetStore.settings)
   if (presetStore.ledger) bag.ctx.storage.set('ledger', presetStore.ledger)
-  bag.ctx.storage.set('settings', { apiKey: 'sk-selfcheck', ...(presetStore.settings || {}) })
   const plugin = await freshPlugin()
   plugin.register(bag.ctx)
-  bag.wait = () => new Promise(r => setTimeout(r, 30))
+  bag.wait = () => new Promise(r => setTimeout(r, 40))
   await bag.wait()
   return bag
 }
@@ -248,10 +264,16 @@ async function scenario({ fixtures, presetStore = {} }) {
 globalThis.__WHALE_LOCALE__ = 'zh'
 
 let bag = await scenario({ fixtures: [balanceFixture('CNY', 53.22)] })
-check('register() 跑通并注册贡献点', bag.contribs.length === 4, bag.contribs.map(c => c.id).join(', '))
-check('初始观测写入账本', bag.store.ledger?.currency === 'CNY' && bag.store.ledger?.spent === 0, JSON.stringify(bag.store.ledger))
+check('register() 只注册状态栏 + ⌘K', bag.contribs.map(c => c.id).join(', ') === 'chip, cmd-refresh, cmd-reload-key', bag.contribs.map(c => c.id).join(', '))
+check('没有面板/浮层/聊天指令贡献点', !bag.contribs.some(c => ['pane', 'directive', 'cmd-open'].includes(c.id)))
+check(
+  '首次运行自动从 config.yaml 取 key',
+  bag.store.settings?.apiKey === 'sk-from-config' && globalThis.__WHALE_FETCHES__.some(f => f.auth === 'Bearer sk-from-config'),
+  bag.store.settings?.apiKey ?? '(none)'
+)
+check('余额落到账本', bag.store.ledger?.currency === 'CNY' && bag.store.ledger?.last === 53.22, JSON.stringify(bag.store.ledger))
 
-// 同一天：下降 → 持平 → 充值 → 再下降
+// 记账：同一天下降 → 持平 → 充值 → 再下降
 {
   const chip = bag.contribs.find(c => c.id === 'chip')
   const onClick = findHandler(chip.render(), 'onClick')
@@ -265,24 +287,25 @@ check('初始观测写入账本', bag.store.ledger?.currency === 'CNY' && bag.st
     await bag.wait()
   }
   check('记账：只累计下降、充值不记负支出', Math.abs(bag.store.ledger.spent - 1.5) < 1e-9, `今日已用 = ${bag.store.ledger.spent}`)
+
   const chipText = treeText(chip.render())
   check('状态栏渲染出鲸鱼与余额', chipText.includes('🐳') && chipText.includes('59.50'), chipText.trim().slice(0, 60))
+  // 悬停文案在 Tip 的 label 上，得展开函数组件才看得到
+  const tipLabel = String(findProp(chip.render(), 'label') ?? '')
+  check('悬停信息含今日已用与时段', tipLabel.includes('今日已用') && (tipLabel.includes('高峰') || tipLabel.includes('谷价')), tipLabel.slice(0, 90))
 }
 
-// 币种切换：整本重置，不串币种
+// 币种切换：整本重置
 {
   bag = await scenario({
     fixtures: [balanceFixture('CNY', 38.82)],
-    presetStore: { ledger: { date: new Date().toISOString().slice(0, 10), currency: 'CNY', last: 40.0, spent: 1.18 } }
+    presetStore: { settings: { apiKey: 'sk-x' }, ledger: { date: new Date().toISOString().slice(0, 10), currency: 'CNY', last: 40.0, spent: 1.18 } }
   })
-  const chip = bag.contribs.find(c => c.id === 'chip')
-  const onClick = findHandler(chip.render(), 'onClick')
+  const onClick = findHandler(bag.contribs.find(c => c.id === 'chip').render(), 'onClick')
+  const currencies = ['CNY', 'USD', 'USD']
+  const amounts = [38.82, 5.0, 4.0]
   let call = 0
-  const currencies = ['CNY', 'CNY', 'USD', 'USD']
-  const amounts = [38.82, 38.82, 5.0, 4.0]
   globalThis.fetch = async () => ({ ok: true, status: 200, json: async () => balanceFixture(currencies[call], amounts[call++]) })
-  onClick()
-  await bag.wait()
   onClick()
   await bag.wait()
   onClick()
@@ -301,48 +324,30 @@ check('初始观测写入账本', bag.store.ledger?.currency === 'CNY' && bag.st
 {
   bag = await scenario({
     fixtures: [balanceFixture('CNY', 30.0)],
-    presetStore: { ledger: { date: '2020-01-01', currency: 'CNY', last: 99.0, spent: 42.0 } }
+    presetStore: { settings: { apiKey: 'sk-x' }, ledger: { date: '2020-01-01', currency: 'CNY', last: 99.0, spent: 42.0 } }
   })
   check('跨天账本归零', bag.store.ledger.spent === 0 && bag.store.ledger.date !== '2020-01-01', JSON.stringify(bag.store.ledger))
 }
 
-// 面板入口 / 聊天卡片 / ⌘K
+// 没 key 时不炸：状态栏提示 + 不发请求
+{
+  bag = await scenario({ fixtures: [balanceFixture('CNY', 1)], configKey: '' })
+  const chipText = treeText(bag.contribs.find(c => c.id === 'chip').render())
+  check('没有 key 时状态栏提示而非报错', chipText.includes('未配 key') && !chipText.includes('render-error'), chipText.trim().slice(0, 40))
+}
+
+// ⌘K 行
 {
   bag = await scenario({ fixtures: [balanceFixture('CNY', 53.22)] })
-  globalThis.__WHALE_OPENED__ = []
-  findHandler(bag.contribs.find(c => c.id === 'chip').render(), 'onClick')()
-  const opened = globalThis.__WHALE_OPENED__[0]
-  check(
-    '点鲸鱼以右侧 workspace 标签页打开面板',
-    opened?.id === 'whale-widget:panel' && opened.options.dock?.pos === 'right' && typeof opened.options.render === 'function',
-    opened ? `${opened.id} dock=${opened.options.dock?.pos}` : 'not opened'
-  )
-  const paneText = treeText(opened.options.render()).replace(/\s+/g, ' ')
-  check(
-    '面板渲染中文标签与余额',
-    paneText.includes('今日已用') && paneText.includes('本轮消耗') && paneText.includes('53.22') && !paneText.includes('render-error'),
-    paneText.slice(0, 90)
-  )
-  const directive = bag.contribs.find(c => c.id === 'directive')
-  check('::whale 指令已注册且能渲染', directive.data?.name === 'whale' && treeText(directive.data.render()).includes('余额 ¥53.22'))
-  const palette = bag.contribs.find(c => c.id === 'cmd-refresh')
-  check('⌘K 命令带实时详情', typeof palette.data.detail === 'function' && palette.data.detail().includes('53.22'), palette.data.detail())
-
-  // 每轮消耗：先有上一轮累计做基准，busy 拉高，usage 上升，busy 落下结算
-  bag = await scenario({ fixtures: [balanceFixture('CNY', 53.22)], presetStore: { settings: { turnToast: true } } })
-  sdk.host.state.focusedUsage.set({ calls: 1, input: 3000, output: 800, total: 5000, cost_usd: 0.05 })
-  sdk.host.state.busy.set(true)
+  const refresh = bag.contribs.find(c => c.id === 'cmd-refresh').data
+  check('⌘K 刷新行带实时余额', typeof refresh.detail === 'function' && refresh.detail().includes('53.22'), refresh.detail())
+  const reload = bag.contribs.find(c => c.id === 'cmd-reload-key').data
+  let ran = null
+  globalThis.__WHALE_NOTIFS__ = []
+  await reload.run()
   await bag.wait()
-  sdk.host.state.focusedUsage.set({ calls: 2, input: 4000, output: 1000, total: 6200, cost_usd: 0.06 })
-  await bag.wait()
-  sdk.host.state.busy.set(false)
-  await bag.wait()
-  const notifs = globalThis.__WHALE_NOTIFS__ ?? []
-  check(
-    '每轮消耗结算并弹提示',
-    notifs.some(n => String(n.message).includes('本轮消耗') && String(n.message).includes('1,200')),
-    notifs.map(n => n.message).join(' | ') || 'no toast'
-  )
+  ran = (globalThis.__WHALE_NOTIFS__ ?? []).map(n => String(n.message)).join(' | ')
+  check('⌘K 重读 key 会回话', ran.includes('已读取 key'), ran || 'no toast')
 
   let threw = null
   try {
@@ -356,13 +361,13 @@ check('初始观测写入账本', bag.store.ledger?.currency === 'CNY' && bag.st
 // ── 4. 真实接口（可选）──────────────────────────────────────────────────────
 if (process.env.WHALE_REAL_KEY) {
   globalThis.fetch = nativeFetch
-  const bag2 = makeCtx()
-  bag2.ctx.storage.set('settings', { apiKey: process.env.WHALE_REAL_KEY })
-  const plugin = await freshPlugin()
-  plugin.register(bag2.ctx)
-  await new Promise(r => setTimeout(r, 2000))
+  const bag2 = await scenario({ fixtures: [balanceFixture('CNY', 0)], configKey: process.env.WHALE_REAL_KEY })
+  globalThis.fetch = nativeFetch
+  const onClick = findHandler(bag2.contribs.find(c => c.id === 'chip').render(), 'onClick')
+  onClick()
+  await new Promise(r => setTimeout(r, 2500))
   const text = treeText(bag2.contribs.find(c => c.id === 'chip').render()).replace(/\s+/g, ' ').trim()
-  check('真实接口取到余额', /¥\d/.test(text), `${text.slice(0, 40)} | ledger=${JSON.stringify(bag2.store.ledger)}`)
+  check('真实接口取到余额（走自动读 key 的完整链路）', /¥\d/.test(text), `${text.slice(0, 40)} | ledger=${JSON.stringify(bag2.store.ledger)}`)
 }
 
 // ── 收工 ────────────────────────────────────────────────────────────────────

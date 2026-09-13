@@ -1,7 +1,7 @@
 ---
 name: whale-widget
-description: "Use when showing DeepSeek balance/usage in chat. Emits the ::whale card."
-version: 1.0.0
+description: "Use when asked about DeepSeek balance inside Hermes. Reads the statusbar whale."
+version: 1.1.0
 author: K4GuR4-yhz (Hermes port of MeteorNOX/dsh-whale-widget)
 license: MIT
 platforms: [linux, macos, windows]
@@ -11,38 +11,24 @@ metadata:
     related_skills: [hermes-token-cost-audit]
 ---
 
-# 小鲸鱼余额挂件（hermes-whale-widget）
+# 小鲸鱼余额（Hermes 状态栏）
 
-桌面端装了 `whale-widget` 插件时，可以在回答里插入一张鲸鱼卡片，显示当前 DeepSeek 余额、
-今日已用和计费时段。**只有插件在跑的时候才有意义**——没装就是一行普通文字，不会报错。
+`whale-widget` 插件在 Hermes 桌面端状态栏右侧常驻一只 🐳 显示 DeepSeek 余额。
+**它只有这一个面**：没有面板、没有浮层桌宠、也没有 `::whale` 聊天指令
+（那些形态做过但已按用户要求卸载）—— 所以**不要**在回答里写 `::whale`，那只会显示成一行普通文字。
 
-## 怎么用
+## 用户问余额时怎么答
 
-在回答里单独占一行写：
+- 看状态栏的 `🐳 ¥xx.xx`；鼠标悬停给出**今日已用 / 计费时段 / 更新时间**。
+- 点击鲸鱼 = 立刻刷新；`Ctrl+K` 里有 `🐳 刷新 DeepSeek 余额`（详情行就是当前余额）和
+  `🐳 从 config.yaml 重读 DeepSeek key`。
+- 需要精确数字时不要靠肉眼抄：用 `hermes-token-cost-audit` 技能查会话用量/成本，
+  或用 terminal 直接打接口（key 在 `config.yaml` 的 `custom_providers` 里）。
 
-```
-::whale
-```
+## 口径（回答用户时照这个说）
 
-规则（宿主强制）：
-
-- 这些指令必须**独占一个段落**，混在句子里就是普通文本。
-- 卡片内容由插件实时渲染，你不用也不能传参数。
-- 一次回答最多放一张，放在相关结论旁边，别当装饰。
-
-## 何时用
-
-- 用户问余额 / 花了多少 / 还能撑多久。
-- 长任务收尾时顺带报一眼余额（用户明确表示关心的时候）。
-
-## 何时别用
-
-- 用户没问余额，也没在跑长任务 —— 别硬塞。
-- 每轮都插：那是噪音。
-
-## 数据口径（回答用户时照这个说）
-
-- **余额**：DeepSeek 官方 `GET /user/balance`，插件每 60 秒刷一次（状态栏点击可手动刷）。
-- **今日已用**：本地记账 = 今日余额下降之和，跨天归零；中途充值不会抵消已用。
-- **本轮消耗**：Hermes 上报的会话 `cost_usd`（USD）与 tokens，和账户 CNY 余额不是一套口径。
-- 想算更细的 token/成本账，配 `hermes-token-cost-audit` 技能一起用。
+- **余额**：DeepSeek 官方 `GET /user/balance`，插件默认每 60 秒刷一次。
+- **今日已用**：本地记账 = 今日余额下降之和，跨天归零；中途充值不会抵消已用，
+  所以它反映"钱少了多少"，不是平台用量接口的数字。
+- 网络抖动时界面沿用最近一次成功的余额，只在 tooltip 里标错误码（`HTTP_401` = key 失效）。
+- 想算更细的 token/成本账，配 `hermes-token-cost-audit` 一起用。

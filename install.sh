@@ -50,7 +50,7 @@ cat <<'EOF'
 
 下一步：
   1. 桌面端几秒内自动加载；没出现就 Ctrl+K → "Reload desktop plugins"
-  2. 点状态栏那只 🐳（或 Ctrl+K → "打开小鲸鱼挂件面板"）→ 面板 dock 在会话区右侧
-  3. 面板设置区点「从 config.yaml 读取 key」（或手填 sk- key）→ 状态栏出现余额
-  4. 桌宠模式：Shift+点击宠物 → 弹成悬浮桌宠，拖到任意位置；`hermes pets off` 关掉
+  2. 状态栏右侧应出现 🐳 余额：点击刷新，悬停看今日已用 / 计费时段 / 更新时间
+  3. 显示「未配 key」时：确认 config.yaml 里有 DeepSeek 的 custom_providers.api_key，
+     然后 Ctrl+K → "从 config.yaml 重读 DeepSeek key"
 EOF
